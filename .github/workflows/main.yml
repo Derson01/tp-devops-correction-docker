@@ -27,7 +27,7 @@ jobs:
         working-directory: ./simple-api
         run: |
           mvn -B verify sonar:sonar \
-          -Dsonar.projectKey=derson01 \
+          -Dsonar.projectKey=Derson01_tp-devops-correction-docker \
           -Dsonar.organization=Derson01 \
           -Dsonar.host.url=https://sonarcloud.io \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
