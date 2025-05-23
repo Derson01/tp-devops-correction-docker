@@ -1,0 +1,40 @@
+name: CD - Build & Push Docker Images
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Analyse"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./simple-api
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api:${{ github.sha }}
+          push: true
+
+      - name: Build and push database image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./database
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-database:${{ github.sha }}
+          push: true
+
+      - name: Build and push http-server image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./http-server
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-httpd:${{ github.sha }}
+          push: true
