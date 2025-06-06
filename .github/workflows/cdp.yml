@@ -1,0 +1,45 @@
+name: Continuous Deployment - Deploy Docker Containers
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Analyse", "CD - Build & Push Docker Images"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+      - name: Pull latest images from DockerHub
+        run: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api:${{ github.sha }}
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-database:${{ github.sha }}
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-httpd:${{ github.sha }}
+
+      - name: Stop and remove existing containers
+        run: |
+          docker stop tp-backend tp-database tp-httpd || true
+          docker rm tp-backend tp-database tp-httpd || true
+
+      - name: Start Docker containers with new images
+        run: |
+          docker run -d --name tp-backend ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api:${{ github.sha }}
+          docker run -d --name tp-database ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-database:${{ github.sha }}
+          docker run -d --name tp-httpd ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-httpd:${{ github.sha }}
+
+      - name: Deploy with Ansible (Optional step)
+        run: |
+          ansible-playbook -i inventories/setup.yml cdp.yml
+        env:
+          ANSIBLE_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
